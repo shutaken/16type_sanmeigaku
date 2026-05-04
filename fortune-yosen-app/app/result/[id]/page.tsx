@@ -1,55 +1,36 @@
 import { cookies } from "next/headers";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { env } from "@/lib/env";
 import { getResultForSession } from "@/lib/diagnosis";
 
-export default async function ResultPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
+export default async function PremiumPage({ params }: { params: Promise<{ resultId: string }> }) {
+  const { resultId } = await params;
   const cookieStore = await cookies();
   const token = cookieStore.get(env.SESSION_COOKIE_NAME)?.value;
   if (!token) notFound();
-
   let result;
-  try {
-    result = await getResultForSession(id, token);
-  } catch {
-    notFound();
-  }
-  const json = result.result_json;
-
+  try { result = await getResultForSession(resultId, token); } catch { notFound(); }
   return (
     <div className="container">
-      <section className="card">
-        <div className="badge">無料診断結果</div>
-        <h1 className="result-title">{json.title}</h1>
-        <p className="lead">{json.summary}</p>
-        <div className="grid grid-2" style={{ marginTop: 20 }}>
-          <div><strong>性格タイプ</strong><p className="muted">{json.personality.code}｜{json.personality.display_name}</p></div>
-          <div><strong>宿命タイプ</strong><p className="muted">{json.destiny.type_name}</p></div>
+      <section className="card premium-card is-disabled">
+        <div className="premium-lock-overlay" aria-live="polite">
+          <div className="premium-lock-message">
+            <div className="badge">準備中</div>
+            <h2>才能地図プレミアムレポートは現在準備中です</h2>
+            <p>無料診断の内容をさらに深掘りする有料レポート機能を開発中です。公開までは、無料診断結果を自己理解のヒントとしてご利用ください。</p>
+          </div>
         </div>
-      </section>
 
-      <section className="section-list">
-        {json.sections.map((section) => (
-          <article className="card" key={section.key}>
-            <div className="badge">{section.title}</div>
-            <h2>{section.headline}</h2>
-            <p>{section.body}</p>
-          </article>
-        ))}
-        <article className="card">
-          <div className="badge">{json.integration.title}</div>
-          <h2>{json.integration.combination_name}</h2>
-          <p>{json.integration.body}</p>
-          {json.integration.strength_text && <p><strong>強み：</strong>{json.integration.strength_text}</p>}
-          {json.integration.caution_text && <p><strong>注意点：</strong>{json.integration.caution_text}</p>}
-        </article>
-        <article className="card">
-          <h2>{json.premium_teaser.title}</h2>
-          <p>{json.premium_teaser.body}</p>
-          <div className="actions"><Link className="btn" href={`/premium/${id}`}>{json.premium_teaser.cta_label}</Link><Link className="btn secondary" href="/diagnosis">もう一度診断する</Link></div>
-        </article>
+        <div className="badge">有料レポート</div>
+        <h1 style={{ fontSize: "44px" }}>才能地図プレミアムレポート</h1>
+        <p className="lead">「{result.result_json.title}」を、仕事・恋愛・人間関係・長期テーマの具体的な行動指針まで深掘りします。</p>
+        <div className="grid grid-2" style={{ marginTop: 20 }}>
+          <div className="notice"><strong>価格</strong><br />1,480円（税込想定）</div>
+          <div className="notice"><strong>内容</strong><br />向いている仕事、避けたい環境、恋愛パターン、具体アドバイス</div>
+        </div>
+        <div style={{ marginTop: 24 }}>
+          <button className="btn" type="button" disabled>現在準備中です</button>
+        </div>
       </section>
     </div>
   );
