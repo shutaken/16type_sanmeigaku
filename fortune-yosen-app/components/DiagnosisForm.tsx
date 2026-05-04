@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 
 type PersonalityType = { code: string; display_name: string; short_description: string; sort_order: number };
 type Question = { id: string; axis: string; question_text: string; sort_order: number; options: Array<{ option_label: string; option_text: string; score_code: string }> };
@@ -68,7 +67,6 @@ function BirthDateDial({ value, onChange }: { value: string; onChange: (value: s
 }
 
 export default function DiagnosisForm({ personalityTypes, questions }: { personalityTypes: PersonalityType[]; questions: Question[] }) {
-  const router = useRouter();
   const [mode, setMode] = useState<"selected" | "quiz">("selected");
   const [birthDate, setBirthDate] = useState(buildBirthDate(1990, 1, 1));
   const [birthTime, setBirthTime] = useState("");
@@ -99,9 +97,12 @@ export default function DiagnosisForm({ personalityTypes, questions }: { persona
           quiz_answers: mode === "quiz" ? answers : null
         })
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "診断に失敗しました。");
-      router.push(data.result_url);
+      if (!data.result_url) throw new Error("診断結果URLを取得できませんでした。");
+
+      // Set-Cookie が確実に反映された状態で結果ページを開くため、SPA遷移ではなく通常遷移にします。
+      window.location.assign(data.result_url);
     } catch (e) {
       setError(e instanceof Error ? e.message : "診断に失敗しました。");
     } finally {
