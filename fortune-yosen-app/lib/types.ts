@@ -33,5 +33,13 @@ export type DiagnosisResultJson = {
     content_version: number;
     used_tables: Record<string, string | number | undefined>;
     calculation_mode: "deterministic_fallback" | "production_sanmei";
+    sanmei?: {
+      pillars: Record<string, unknown>;
+      hidden_stems: Record<string, unknown>;
+      mapping: Record<string, unknown>;
+      solar_terms: Record<string, unknown>;
+      precision: string;
+      note: string;
+    };
   };
 };

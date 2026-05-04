@@ -1,6 +1,6 @@
 import "server-only";
 import { supabaseAdmin } from "@/lib/supabase";
-import { calculateYosenFiveStars } from "@/lib/sanmei";
+import { calculateSanmeiProfile } from "@/lib/sanmei";
 import type { DiagnosisResultJson, FiveStars, PositionCode, ResultSectionKey, StarCode } from "@/lib/types";
 
 type PersonalityRow = { id: string; code: string; display_name: string; short_description: string };
@@ -60,7 +60,8 @@ export async function createDiagnosis(params: {
   const personalityCode = params.personalityCode || (params.quizAnswers ? derivePersonalityCodeFromAnswers(params.quizAnswers) : null);
   if (!personalityCode) throw new Error("性格タイプを選択するか、簡易診断に回答してください。");
 
-  const fiveStars = calculateYosenFiveStars({ birthDate: params.birthDate, birthTime: params.birthTime });
+  const sanmeiProfile = calculateSanmeiProfile({ birthDate: params.birthDate, birthTime: params.birthTime });
+  const fiveStars = sanmeiProfile.five_stars;
   const { data: session, error: sessionError } = await supabaseAdmin
     .from("diagnosis_sessions")
     .upsert({ session_token: params.sessionToken, status: "started", user_agent: params.userAgent, ip_hash: params.ipHash }, { onConflict: "session_token" })
@@ -92,7 +93,7 @@ export async function createDiagnosis(params: {
     .single();
   if (inputError) throw inputError;
 
-  const { resultJson, ids, freeText } = await buildDiagnosisResultJson(personality as PersonalityRow, fiveStars);
+  const { resultJson, ids, freeText } = await buildDiagnosisResultJson(personality as PersonalityRow, sanmeiProfile);
 
   const { data: result, error: resultError } = await supabaseAdmin
     .from("diagnosis_results")
@@ -106,10 +107,16 @@ export async function createDiagnosis(params: {
       right_hand_star_id: ids.right_hand,
       stomach_star_id: ids.stomach,
       combination_id: ids.combination ?? null,
+      year_stem: sanmeiProfile.pillars.year.stem,
+      year_branch: sanmeiProfile.pillars.year.branch,
+      month_stem: sanmeiProfile.pillars.month.stem,
+      month_branch: sanmeiProfile.pillars.month.branch,
+      day_stem: sanmeiProfile.pillars.day.stem,
+      day_branch: sanmeiProfile.pillars.day.branch,
       result_title: resultJson.title,
       free_result_text: freeText,
       result_json: resultJson,
-      calculation_json: { fiveStars, mode: resultJson.meta.calculation_mode },
+      calculation_json: sanmeiProfile,
       content_version: resultJson.meta.content_version,
       generated_by: "template"
     })
@@ -121,7 +128,8 @@ export async function createDiagnosis(params: {
   return { diagnosisResultId: result.id };
 }
 
-async function buildDiagnosisResultJson(personality: PersonalityRow, fiveStars: FiveStars) {
+async function buildDiagnosisResultJson(personality: PersonalityRow, sanmeiProfile: ReturnType<typeof calculateSanmeiProfile>) {
+  const fiveStars = sanmeiProfile.five_stars;
   const starCodes = Array.from(new Set(Object.values(fiveStars)));
   const { data: starsData, error: starsError } = await supabaseAdmin
     .from("sanmei_stars")
@@ -183,7 +191,15 @@ async function buildDiagnosisResultJson(personality: PersonalityRow, fiveStars: 
     meta: {
       content_version: Math.max(...textRows.map((r) => r.version), combo?.version ?? 1),
       used_tables: { personality_types: personality.code, sanmei_stars_main: mainStar.code, star_position_texts_version: Math.max(...textRows.map((r) => r.version)), personality_star_combinations_version: combo?.version },
-      calculation_mode: "deterministic_fallback"
+      calculation_mode: "production_sanmei",
+      sanmei: {
+        pillars: sanmeiProfile.pillars,
+        hidden_stems: sanmeiProfile.hidden_stems,
+        mapping: sanmeiProfile.mapping,
+        solar_terms: sanmeiProfile.solar_terms,
+        precision: sanmeiProfile.precision,
+        note: sanmeiProfile.note
+      }
     }
   };
 
