@@ -6,10 +6,71 @@ import { useRouter } from "next/navigation";
 type PersonalityType = { code: string; display_name: string; short_description: string; sort_order: number };
 type Question = { id: string; axis: string; question_text: string; sort_order: number; options: Array<{ option_label: string; option_text: string; score_code: string }> };
 
+const CURRENT_YEAR = new Date().getFullYear();
+const MIN_YEAR = 1920;
+
+function pad2(value: number) {
+  return String(value).padStart(2, "0");
+}
+
+function daysInMonth(year: number, month: number) {
+  return new Date(year, month, 0).getDate();
+}
+
+function buildBirthDate(year: number, month: number, day: number) {
+  return `${year}-${pad2(month)}-${pad2(day)}`;
+}
+
+function BirthDateDial({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const today = new Date();
+  const initialYear = value ? Number(value.slice(0, 4)) : 1990;
+  const initialMonth = value ? Number(value.slice(5, 7)) : today.getMonth() + 1;
+  const initialDay = value ? Number(value.slice(8, 10)) : today.getDate();
+
+  const [year, setYear] = useState(initialYear);
+  const [month, setMonth] = useState(initialMonth);
+  const [day, setDay] = useState(Math.min(initialDay, daysInMonth(initialYear, initialMonth)));
+
+  const years = useMemo(() => Array.from({ length: CURRENT_YEAR - MIN_YEAR + 1 }, (_, i) => CURRENT_YEAR - i), []);
+  const months = useMemo(() => Array.from({ length: 12 }, (_, i) => i + 1), []);
+  const days = useMemo(() => Array.from({ length: daysInMonth(year, month) }, (_, i) => i + 1), [year, month]);
+
+  function update(nextYear: number, nextMonth: number, nextDay: number) {
+    const safeDay = Math.min(nextDay, daysInMonth(nextYear, nextMonth));
+    setYear(nextYear);
+    setMonth(nextMonth);
+    setDay(safeDay);
+    onChange(buildBirthDate(nextYear, nextMonth, safeDay));
+  }
+
+  return (
+    <div className="date-dial" role="group" aria-label="生年月日">
+      <label className="dial-select">
+        <span>年</span>
+        <select value={year} onChange={(e) => update(Number(e.target.value), month, day)}>
+          {years.map((y) => <option key={y} value={y}>{y}年</option>)}
+        </select>
+      </label>
+      <label className="dial-select">
+        <span>月</span>
+        <select value={month} onChange={(e) => update(year, Number(e.target.value), day)}>
+          {months.map((m) => <option key={m} value={m}>{m}月</option>)}
+        </select>
+      </label>
+      <label className="dial-select">
+        <span>日</span>
+        <select value={day} onChange={(e) => update(year, month, Number(e.target.value))}>
+          {days.map((d) => <option key={d} value={d}>{d}日</option>)}
+        </select>
+      </label>
+    </div>
+  );
+}
+
 export default function DiagnosisForm({ personalityTypes, questions }: { personalityTypes: PersonalityType[]; questions: Question[] }) {
   const router = useRouter();
   const [mode, setMode] = useState<"selected" | "quiz">("selected");
-  const [birthDate, setBirthDate] = useState("");
+  const [birthDate, setBirthDate] = useState(buildBirthDate(1990, 1, 1));
   const [birthTime, setBirthTime] = useState("");
   const [gender, setGender] = useState("unspecified");
   const [personalityCode, setPersonalityCode] = useState("INTJ");
@@ -52,7 +113,11 @@ export default function DiagnosisForm({ personalityTypes, questions }: { persona
     <div className="form" style={{ marginTop: 24 }}>
       {error && <div className="error">{error}</div>}
       <div className="grid grid-2">
-        <div className="field"><label>生年月日</label><input type="date" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} required /></div>
+        <div className="field">
+          <label>生年月日</label>
+          <BirthDateDial value={birthDate} onChange={setBirthDate} />
+          <p className="field-help">年・月・日をそれぞれ選択してください。</p>
+        </div>
         <div className="field"><label>出生時間 任意</label><input type="time" value={birthTime} onChange={(e) => setBirthTime(e.target.value)} /></div>
       </div>
       <div className="field"><label>性別 任意</label><select value={gender} onChange={(e) => setGender(e.target.value)}><option value="unspecified">回答しない</option><option value="male">男性</option><option value="female">女性</option><option value="other">その他</option></select></div>
